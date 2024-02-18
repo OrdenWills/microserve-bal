@@ -2,7 +2,7 @@
 import numpy as np # linear algebra
 
 from keras.models import Sequential, Model
-from keras.layers import Conv2D, MaxPooling2D, Dense, Dropout, Input, Flatten, SeparableConv2D,BatchNormalization
+from keras.layers import Conv2D, MaxPool2D, Dense, Dropout, Input, Flatten, BatchNormalization
 from keras.models import Model
 import cv2
 from flask import Flask,render_template,redirect,url_for,request,flash,jsonify
@@ -15,14 +15,9 @@ IMG_DIR = './static/images'
 
 
 def process_images(img):
-    img = cv2.imread(str(img))
-    img = cv2.resize(img, (224,224))
-    if img.shape[2] ==1:
-        img = np.dstack([img, img, img])
-    else:
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    img = img.astype(np.float32)/255.
-    
+    img = cv2.imread(str(img),cv2.IMREAD_GRAYSCALE)
+    img = cv2.resize(img, (150,150))
+
     return img[None]
 
 def predict(model,img):
@@ -31,37 +26,31 @@ def predict(model,img):
     return np.max(pred),np.argmax(pred)
 
 def base_model():
-    input_img = Input(shape=(224,224,3), name='ImageInput')
-    x = Conv2D(64, (3,3), activation='relu', padding='same', name='Conv1_1')(input_img)
-    x = Conv2D(64, (3,3), activation='relu', padding='same', name='Conv1_2')(x)
-    x = MaxPooling2D((2,2), name='pool1')(x)
+    model = Sequential()
+    model.add(Conv2D(32 , (3,3) , strides = 1 , padding = 'same' , activation = 'relu' , input_shape = (150,150,1)))
+    model.add(BatchNormalization())
+    model.add(MaxPool2D((2,2) , strides = 2 , padding = 'same'))
+    model.add(Conv2D(64 , (3,3) , strides = 1 , padding = 'same' , activation = 'relu'))
+    model.add(Dropout(0.1))
+    model.add(BatchNormalization())
+    model.add(MaxPool2D((2,2) , strides = 2 , padding = 'same'))
+    model.add(Conv2D(64 , (3,3) , strides = 1 , padding = 'same' , activation = 'relu'))
+    model.add(BatchNormalization())
+    model.add(MaxPool2D((2,2) , strides = 2 , padding = 'same'))
+    model.add(Conv2D(128 , (3,3) , strides = 1 , padding = 'same' , activation = 'relu'))
+    model.add(Dropout(0.2))
+    model.add(BatchNormalization())
+    model.add(MaxPool2D((2,2) , strides = 2 , padding = 'same'))
+    model.add(Conv2D(256 , (3,3) , strides = 1 , padding = 'same' , activation = 'relu'))
+    model.add(Dropout(0.2))
+    model.add(BatchNormalization())
+    model.add(MaxPool2D((2,2) , strides = 2 , padding = 'same'))
+    model.add(Flatten())
+    model.add(Dense(units = 128 , activation = 'relu'))
+    model.add(Dropout(0.2))
+    model.add(Dense(units = 1 , activation = 'sigmoid'))
+    # model.compile(optimizer = "rmsprop" , loss = 'binary_crossentropy' , metrics = ['accuracy'])
     
-    x = SeparableConv2D(128, (3,3), activation='relu', padding='same', name='Conv2_1')(x)
-    x = SeparableConv2D(128, (3,3), activation='relu', padding='same', name='Conv2_2')(x)
-    x = MaxPooling2D((2,2), name='pool2')(x)
-    
-    x = SeparableConv2D(256, (3,3), activation='relu', padding='same', name='Conv3_1')(x)
-    x = BatchNormalization(name='bn1')(x)
-    x = SeparableConv2D(256, (3,3), activation='relu', padding='same', name='Conv3_2')(x)
-    x = BatchNormalization(name='bn2')(x)
-    x = SeparableConv2D(256, (3,3), activation='relu', padding='same', name='Conv3_3')(x)
-    x = MaxPooling2D((2,2), name='pool3')(x)
-    
-    x = SeparableConv2D(512, (3,3), activation='relu', padding='same', name='Conv4_1')(x)
-    x = BatchNormalization(name='bn3')(x)
-    x = SeparableConv2D(512, (3,3), activation='relu', padding='same', name='Conv4_2')(x)
-    x = BatchNormalization(name='bn4')(x)
-    x = SeparableConv2D(512, (3,3), activation='relu', padding='same', name='Conv4_3')(x)
-    x = MaxPooling2D((2,2), name='pool4')(x)
-    
-    x = Flatten(name='flatten')(x)
-    x = Dense(1024, activation='relu', name='fc1')(x)
-    x = Dropout(0.7, name='dropout1')(x)
-    x = Dense(512, activation='relu', name='fc2')(x)
-    x = Dropout(0.5, name='dropout2')(x)
-    x = Dense(2, activation='softmax', name='fc3')(x)
-    
-    model = Model(inputs=input_img, outputs=x)
     return model
 
 def load_model(model,path='best-balanced.weights.h5'):
